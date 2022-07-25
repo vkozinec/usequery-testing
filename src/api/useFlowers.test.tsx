@@ -2,14 +2,18 @@
 import { useFlowers } from "./useFlowers";
 import nock from "nock";
 import { createWrapper } from "../utils";
-import { cleanup, waitFor } from "@testing-library/react";
-import { renderHook } from "@testing-library/react-hooks";
+import { cleanup } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react-hooks";
 
-const generateMockedResponse = (page: any) => {
+const generateMockedResponse = (page: any, total_pages = 2) => {
+  const currentPage = Number(page);
+  const nextPage = currentPage + 1;
+  const previousPage = currentPage - 1;
+
   return {
     data: [
       {
-        id: 7,
+        id: currentPage,
         name: "Alpski volcin",
         latin_name: "Daphne alpina",
         sightings: 19,
@@ -20,10 +24,10 @@ const generateMockedResponse = (page: any) => {
     ],
     meta: {
       pagination: {
-        current_page: Number(page),
-        prev_page: null,
-        next_page: 2,
-        total_pages: 4,
+        current_page: currentPage,
+        prev_page: previousPage > 0 ? previousPage : null,
+        next_page: nextPage <= total_pages ? nextPage : null,
+        total_pages,
       },
     },
   };
@@ -42,7 +46,6 @@ describe("query hook", () => {
       .reply(200, (uri) => {
         const url = new URL(`https://flowrspot-api.herokuapp.com/api${uri}`);
         const { page } = Object.fromEntries(url.searchParams);
-
         return generateMockedResponse(page);
       });
   });
@@ -50,20 +53,26 @@ describe("query hook", () => {
   afterEach(cleanup);
 
   test("successful query hook", async () => {
-    const { result } = renderHook(() => useFlowers(), {
+    const { result, waitFor } = renderHook(() => useFlowers(), {
       wrapper: createWrapper(),
     });
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // Works
+    await waitFor(() => result.current.isSuccess);
 
+    // Works
     expect(result.current.data?.pages).toStrictEqual([
       generateMockedResponse(1),
     ]);
 
-    result.current.fetchNextPage();
+    // Sweet.
+    expect(result.current.hasNextPage).toBe(true);
 
-    await waitFor(() => result.current.isFetching);
-    await waitFor(() => !result.current.isFetching);
+    act(() => {
+      result.current.fetchNextPage();
+    });
+
+    await waitFor(() => result.current.data?.pages.length === 2);
 
     expect(result.current.data?.pages).toStrictEqual([
       generateMockedResponse(1),
