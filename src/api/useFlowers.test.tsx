@@ -2,7 +2,7 @@
 import { useFlowers } from "./useFlowers";
 import nock from "nock";
 import { createWrapper } from "../utils";
-import { cleanup } from "@testing-library/react";
+import { cleanup, waitFor } from "@testing-library/react";
 import { renderHook } from "@testing-library/react-hooks";
 
 const generateMockedResponse = (page: any) => {
@@ -50,7 +50,7 @@ describe("query hook", () => {
   afterEach(cleanup);
 
   test("successful query hook", async () => {
-    const { result, waitFor } = renderHook(() => useFlowers(), {
+    const { result } = renderHook(() => useFlowers(), {
       wrapper: createWrapper(),
     });
 
@@ -62,8 +62,8 @@ describe("query hook", () => {
 
     result.current.fetchNextPage();
 
-    await waitFor(() => expect(result.current.isFetching).toBe(true));
-    await waitFor(() => expect(result.current.isFetching).toBe(true));
+    await waitFor(() => result.current.isFetching);
+    await waitFor(() => !result.current.isFetching);
 
     expect(result.current.data?.pages).toStrictEqual([
       generateMockedResponse(1),
